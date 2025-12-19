@@ -1,37 +1,76 @@
 # .github/workflows/build-apk.yml
-name: Build Android APK
+name: Build and Deploy Web App
 
 on:
-  workflow_dispatch:  # يسمح لك بتشغيل العملية يدوياً من صفحة Actions
+  workflow_dispatch:  # تشغيل يدوي
+  push:               # تشغيل تلقائي عند رفع أي تغيير
+    branches: [ main ]
 
 jobs:
-  build:
+  build-test:
     runs-on: ubuntu-latest
-
+    
     steps:
-    - name: 📥 تحميل الكود
+    - name: 📥 تحميل الملفات
       uses: actions/checkout@v3
-
-    - name: ⚙️ إعداد بيئة Android
-      uses: android-actions/setup-android@v2
-
-    - name: 📦 إنشاء APK تجريبي (هذه خطوة تجريبية)
+      
+    - name: 🔍 فحص هيكل المشروع
       run: |
-        echo "✅ هذه خطوة تجريبية!"
-        echo "لقد قمت برفع:"
+        echo "=== 📁 هيكل المشروع ==="
         find . -type f -name "*.html" -o -name "*.js" | while read file; do
-          echo "  - $file"
+          size=$(wc -c < "$file")
+          lines=$(wc -l < "$file" 2>/dev/null || echo "?")
+          echo "• $file ($size bytes, $lines lines)"
         done
-        # لاحقاً، سنضيف هنا أوامر Cordova لبناء APK حقيقي
-        echo "سيتم بناء APK هنا في المستقبل."
-
-    - name: 📁 إنشاء ملف ZIP بديل للتنزيل
+        
+        echo ""
+        echo "=== ✅ فحص الملفات الأساسية ==="
+        [ -f "index.html" ] && echo "✓ index.html موجود" || echo "✗ index.html مفقود"
+        [ -f "js/main.js" ] && echo "✓ js/main.js موجود" || echo "✗ js/main.js مفقود"
+        [ -f "js/zip-builder.js" ] && echo "✓ js/zip-builder.js موجود" || echo "✗ js/zip-builder.js مفقود"
+        
+    - name: 🧪 اختبار JavaScript بسيط
       run: |
-        zip -r web_files.zip index.html js/
-        echo "✅ تم إنشاء أرشيف يحتوي على ملفات موقعك: web_files.zip"
-
-    - name: 📤 رفع الأرشيف كمنتج (Artifact)
+        echo "=== 🧪 تحليل ملفات JS ==="
+        # التحقق من وجود مكتبة JSZip في index.html
+        if grep -q "jszip.min.js" index.html; then
+          echo "✅ JSZip مضمن في HTML"
+        else
+          echo "⚠️  JSZip غير موجود في HTML"
+        fi
+        
+        # عرض أول 3 أسطر من كل ملف JS
+        for jsfile in js/*.js; do
+          if [ -f "$jsfile" ]; then
+            echo ""
+            echo "📄 $jsfile:"
+            head -3 "$jsfile"
+          fi
+        done
+        
+    - name: 📦 إنشاء أرشيف احتياطي
+      run: |
+        echo "=== 📦 إنشاء نسخة احتياطية ==="
+        timestamp=$(date +%Y%m%d_%H%M%S)
+        zip -r "web_app_backup_$timestamp.zip" . -x ".git/*" "*.zip"
+        echo "✅ تم الإنشاء: web_app_backup_$timestamp.zip"
+        
+    - name: 📊 إنشاء تقرير البناء
+      run: |
+        echo "=== 📊 تقرير البناء ==="
+        echo "الوقت: $(date)"
+        echo "المستخدم: ${{ github.actor }}"
+        echo "الرسالة: ${{ github.event.head_commit.message }}"
+        echo ""
+        echo "📈 إحصائيات الملفات:"
+        echo "- HTML: $(find . -name "*.html" | wc -l) ملف"
+        echo "- JavaScript: $(find . -name "*.js" | wc -l) ملف"
+        echo "- إجمالي: $(find . -type f | wc -l) ملف"
+        
+    - name: 📤 رفع التقارير
       uses: actions/upload-artifact@v3
       with:
-        name: web-files-archive
-        path: web_files.zip
+        name: build-reports
+        path: |
+          web_app_backup_*.zip
+        retention-days: 7
