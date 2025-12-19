@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منشئ تطبيقات WebView - بدون خدمات خارجية</title>
+    
+    <!-- الأيقونة -->
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📱</text></svg>">
+    
+    <!-- مكتبات -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <style>
+        /* CSS Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Cairo', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        :root {
+            --primary: #4361ee;
+            --secondary: #3a0ca3;
+            --success: #4cc9f0;
+            --warning: #f72585;
+            --dark: #22223b;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .logo {
+            font-size: 50px;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        h1 {
+            color: var(--dark);
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: var(--gray);
+            font-size: 1.1em;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        /* Steps */
+        .steps {
+            display: flex;
+            justify-content: space-between;
+            margin: 40px 0;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .step {
+            flex: 1;
+            min-width: 250px;
+            text-align: center;
+            padding: 25px;
+            background: linear-gradient(135deg, #f8f9ff 0%, #eef2ff 100%);
+            border-radius: 15px;
+            border: 2px solid #e0e7ff;
+            transition: all 0.3s;
+        }
+        
+        .step:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+            border-color: var(--primary);
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            line-height: 50px;
+            font-weight: bold;
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+        
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin: 40px 0;
+        }
+        
+        @media (max-width: 992px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Upload Section */
+        .upload-section {
+            border: 3px dashed var(--primary);
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .upload-section:hover {
+            background: #edf0ff;
+            border-color: var(--secondary);
+        }
+        
+        .upload-icon {
+            font-size: 70px;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+        
+        .file-input {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        
+        /* File List */
+        .file-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 10px;
+        }
+        
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        
+        .file-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .file-icon {
+            font-size: 1.2em;
+        }
+        
+        .file-details {
+            text-align: right;
+        }
+        
+        .file-name {
+            font-weight: bold;
+            color: var(--dark);
+        }
+        
+        .file-size {
+            color: var(--gray);
+            font-size: 0.85em;
+        }
+        
+        /* Settings Section */
+        .settings-section {
+            background: #f8f9ff;
+            padding: 30px;
+            border-radius: 15px;
+        }
+        
+        .setting-group {
+            margin-bottom: 25px;
+        }
+        
+        .setting-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .setting-group input[type="text"],
+        .setting-group input[type="url"],
+        .setting-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .setting-group input:focus,
+        .setting-group select:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+        }
+        
+        /* Icon Preview */
+        .icon-preview {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .icon-display {
+            width: 100px;
+            height: 100px;
+            border-radius: 20px;
+            background: white;
+            border: 3px solid var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .icon-display img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        
+        /* Checkbox Group */
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-weight: normal;
+        }
+        
+        /* Generate Button */
+        .generate-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+            margin: 40px 0 20px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .generate-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(67, 97, 238, 0.3);
+        }
+        
+        .generate-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        /* Status Messages */
+        .status {
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+            border-right: 5px solid;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border-color: #28a745;
+            display: block;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #dc3545;
+            display: block;
+        }
+        
+        .status.processing {
+            background: #fff3cd;
+            color: #856404;
+            border-color: #ffc107;
+            display: block;
+        }
+        
+        /* Download Section */
+        .download-section {
+            background: #28a745;
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-top: 30px;
+            text-align: center;
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .download-btn {
+            background: white;
+            color: #28a745;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 20px 10px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s;
+        }
+        
+        .download-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        }
+        
+        /* Instructions */
+        .instructions {
+            background: #f8f9ff;
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 30px;
+            border-left: 5px solid var(--primary);
+        }
+        
+        .instructions h3 {
+            color: var(--dark);
+            margin-bottom: 15px;
+        }
+        
+        .instructions ol {
+            padding-right: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 10px;
+        }
+        
+        /* Footer */
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: var(--gray);
+            font-size: 0.9em;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .steps {
+                flex-direction: column;
+            }
+            
+            .step {
+                min-width: 100%;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+        }
+        
+        /* Loading Animation */
+        .loader {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Delete Button */
+        .delete-btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+        
+        .delete-btn:hover {
+            background: #ff3742;
+        }
+        
+        /* Progress Bar */
+        .progress-container {
+            width: 100%;
+            height: 10px;
+            background: #e0e0e0;
+            border-radius: 5px;
+            margin: 15px 0;
+            overflow: hidden;
+            display: none;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+            width: 0%;
+            transition: width 0.3s;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <span class="logo">📱</span>
+            <h1>منشئ تطبيقات WebView الذاتي</h1>
+            <p class="subtitle">
+                حوّل موقعك الإلكتروني إلى تطبيق أندرويد كامل - يعمل 100% في المتصفح بدون خدمات خارجية
+            </p>
+        </header>
+        
+        <!-- Steps -->
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3>رفع الملفات</h3>
+                <p>ارفع ملفات HTML, CSS, JavaScript والصور</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3>تخصيص التطبيق</h3>
+                <p>اضبط اسم التطبيق، الأيقونة والإعدادات</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3>إنشاء وتنزيل</h3>
+                <p>أنشئ تطبيق APK وقم بتنزيله مباشرة</p>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left: File Upload -->
+            <div class="left-column">
+                <h2 style="color: var(--dark); margin-bottom: 20px;">📁 رفع الملفات</h2>
+                
+                <div class="upload-section" id="uploadZone">
+                    <input type="file" id="fileInput" class="file-input" multiple 
+                           accept=".html,.css,.js,.png,.jpg,.jpeg,.gif,.svg,.ico,.json,.woff,.woff2,.ttf">
+                    <div class="upload-icon">📤</div>
+                    <h3>اسحب وأفلت الملفات هنا</h3>
+                    <p>أو انقر لاختيار الملفات</p>
+                    <p style="margin-top: 15px; color: var(--gray); font-size: 0.9em;">
+                        يدعم: HTML, CSS, JavaScript, الصور، الخطوط
+                    </p>
+                </div>
+                
+                <div id="fileList" class="file-list">
+                    <!-- الملفات ستظهر هنا -->
+                </div>
+                
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+            </div>
+            
+            <!-- Right: App Settings -->
+            <div class="right-column">
+                <h2 style="color: var(--dark); margin-bottom: 20px;">⚙️ إعدادات التطبيق</h2>
+                
+                <div class="settings-section">
+                    <!-- App Name -->
+                    <div class="setting-group">
+                        <label for="appName">اسم التطبيق:</label>
+                        <input type="text" id="appName" placeholder="مثل: متجر الإلكتروني" value="تطبيق الويب">
+                    </div>
+                    
+                    <!-- Package Name -->
+                    <div class="setting-group">
+                        <label for="packageName">اسم الحزمة (Package Name):</label>
+                        <input type="text" id="packageName" 
+                               placeholder="مثل: com.شركتك.تطبيق" 
+                               value="com.webbuilder.app"
+                               pattern="^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$"
+                               title="يجب أن يبدأ بحرف صغير ويحتوي على نقطة واحدة على الأقل">
+                        <small style="color: var(--gray); display: block; margin-top: 5px;">
+                            مثال: com.company.appname
+                        </small>
+                    </div>
+                    
+                    <!-- Version -->
+                    <div class="setting-group">
+                        <label for="appVersion">رقم الإصدار:</label>
+                        <input type="text" id="appVersion" placeholder="1.0.0" value="1.0.0">
+                    </div>
+                    
+                    <!-- Main File -->
+                    <div class="setting-group">
+                        <label for="mainFile">الصفحة الرئيسية:</label>
+                        <select id="mainFile">
+                            <option value="index.html">index.html</option>
+                            <option value="main.html">main.html</option>
+                            <option value="home.html">home.html</option>
+                        </select>
+                    </div>
+                    
+                    <!-- App Icon -->
+                    <div class="setting-group">
+                        <label for="appIcon">أيقونة التطبيق:</label>
+                        <input type="file" id="appIcon" accept="image/*" style="display: none;">
+                        <div class="icon-preview">
+                            <div class="icon-display" id="iconDisplay">
+                                <span style="font-size: 40px;">📱</span>
+                            </div>
+                            <button type="button" onclick="document.getElementById('appIcon').click()" 
+                                    style="background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer;">
+                                اختر أيقونة
+                            </button>
+                            <p style="color: var(--gray); font-size: 0.9em; margin-top: 10px;">
+                                الأفضل: صورة مربعة 512×512 بكسل
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Additional Settings -->
+                    <div class="setting-group">
+                        <label>إعدادات إضافية:</label>
+                        <div class="checkbox-group">
+                            <label>
+                                <input type="checkbox" id="fullscreen" checked>
+                                <span>ملء الشاشة</span>
+                            </label>
+                            <label>
+                                <input type="checkbox" id="landscape" checked>
+                                <span>عرض أفقي</span>
+                            </label>
+                            <label>
+                                <input type="checkbox" id="javascript" checked>
+                                <span>تفعيل JavaScript</span>
+                            </label>
+                            <label>
+                                <input type="checkbox" id="zoom" checked>
+                                <span>السماح بالتكبير</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Web URL (Optional) -->
+                    <div class="setting-group">
+                        <label for="webUrl">رابط موقع (اختياري):</label>
+                        <input type="url" id="webUrl" placeholder="https://example.com">
+                        <small style="color: var(--gray); display: block; margin-top: 5px;">
+                            اتركه فارغاً إذا كنت ترفع ملفات
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Generate Button -->
+        <button id="generateBtn" class="generate-btn">
+            <span>🛠️ إنشاء تطبيق APK</span>
+        </button>
+        
+        <!-- Status Messages -->
+        <div id="status" class="status"></div>
+        
+        <!-- Download Section -->
+        <div id="downloadSection" class="download-section">
+            <h2>🎉 تم إنشاء التطبيق بنجاح!</h2>
+            <p>يمكنك الآن تنزيل تطبيق الأندرويد وتثبيته على جهازك</p>
+            
+            <div style="margin: 20px 0;">
+                <button id="downloadAPKBtn" class="download-btn">
+                    📥 تنزيل ملف APK
+                </button>
+                <button onclick="showInstructions()" class="download-btn" style="background: #17a2b8; color: white;">
+                    📖 تعليمات التثبيت
+                </button>
+            </div>
+            
+            <div id="appInfo" style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px; margin-top: 20px;">
+                <p><strong>اسم التطبيق:</strong> <span id="finalAppName">-</span></p>
+                <p><strong>حجم الملف:</strong> <span id="finalFileSize">-</span> ميجابايت</p>
+                <p><strong>وقت الإنشاء:</strong> <span id="creationTime">-</span></p>
+            </div>
+        </div>
+        
+        <!-- Instructions -->
+        <div id="instructionsPanel" class="instructions" style="display: none;">
+            <h3>📖 تعليمات تثبيت التطبيق:</h3>
+            <ol>
+                <li>افتح تطبيق "مدير الملفات" على هاتف الأندرويد</li>
+                <li>ابحث عن ملف APK الذي نزلته</li>
+                <li>انقر على الملف للتثبيت</li>
+                <li>إذا ظهرت رسالة "مصدر غير معروف"، اضغط على "إعدادات" وشغل "مصادر غير معروفة"</li>
+                <li>عود واضغط "تثبيت" مرة أخرى</li>
+                <li>انتظر اكتمال التثبيت ثم افتح التطبيق</li>
+            </ol>
+            <p style="margin-top: 15px; color: var(--warning);">
+                ⚠️ ملاحظة: قد تحتاج لتعطيل "Play Protect" في إعدادات Google Play
+            </p>
+        </div>
+        
+        <!-- Footer -->
+        <footer>
+            <p>© 2024 منشئ تطبيقات WebView الذاتي | يعمل 100% في المتصفح بدون خدمات خارجية</p>
+            <p style="margin-top: 10px; font-size: 0.8em;">
+                <strong>معلومات تقنية:</strong> هذا النظام يبني تطبيقات WebView محلية باستخدام JavaScript فقط
+            </p>
+        </footer>
+    </div>
+    
+    <!-- JavaScript Files -->
+    <script src="js/apk-template.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/apk-editor.js"></script>
+    <script src="js/zip-builder.js"></script>
+    
+    <script>
+        // Inline initialization script
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('WebView APK Builder loaded successfully');
+            
+            // Display welcome message
+            setTimeout(() => {
+                showStatus('success', 'مرحباً! ابدأ برفع ملفات موقعك أو إدخال رابط لإنشاء تطبيق أندرويد 🚀');
+            }, 1000);
+        });
+        
+        // Helper function to show instructions
+        function showInstructions() {
+            const panel = document.getElementById('instructionsPanel');
+            panel.style.display = 'block';
+            panel.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
