@@ -12,65 +12,106 @@ jobs:
     
     steps:
     - name: 📥 تحميل الملفات
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: 🔍 فحص هيكل المشروع
       run: |
         echo "=== 📁 هيكل المشروع ==="
-        find . -type f -name "*.html" -o -name "*.js" | while read file; do
-          size=$(wc -c < "$file")
+        find . -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" \) | while read file; do
+          size=$(wc -c < "$file" 2>/dev/null || echo "?")
           lines=$(wc -l < "$file" 2>/dev/null || echo "?")
           echo "• $file ($size bytes, $lines lines)"
         done
         
         echo ""
         echo "=== ✅ فحص الملفات الأساسية ==="
-        [ -f "index.html" ] && echo "✓ index.html موجود" || echo "✗ index.html مفقود"
-        [ -f "js/main.js" ] && echo "✓ js/main.js موجود" || echo "✗ js/main.js مفقود"
-        [ -f "js/zip-builder.js" ] && echo "✓ js/zip-builder.js موجود" || echo "✗ js/zip-builder.js مفقود"
+        check_file() {
+          if [ -f "$1" ]; then
+            echo "✓ $1 موجود"
+            return 0
+          else
+            echo "✗ $1 مفقود"
+            return 1
+          fi
+        }
+        
+        check_file "index.html"
+        check_file "js/main.js"
+        check_file "js/apk-template.js"
+        check_file "js/zip-builder.js"
         
     - name: 🧪 اختبار JavaScript بسيط
       run: |
         echo "=== 🧪 تحليل ملفات JS ==="
-        # التحقق من وجود مكتبة JSZip في index.html
-        if grep -q "jszip.min.js" index.html; then
-          echo "✅ JSZip مضمن في HTML"
-        else
-          echo "⚠️  JSZip غير موجود في HTML"
-        fi
+        echo "ملفات JavaScript الموجودة:"
+        ls -la js/*.js 2>/dev/null || echo "مجلد js/ فارغ"
         
-        # عرض أول 3 أسطر من كل ملف JS
-        for jsfile in js/*.js; do
-          if [ -f "$jsfile" ]; then
-            echo ""
-            echo "📄 $jsfile:"
-            head -3 "$jsfile"
+        echo ""
+        echo "=== 🔗 التحقق من روابط المكتبات ==="
+        if [ -f "index.html" ]; then
+          if grep -q "jszip" index.html; then
+            echo "✅ JSZip مضمن في HTML"
+          else
+            echo "⚠️ JSZip غير موجود في HTML"
+            echo "نصيحة: أضف هذا السطر في <head>:"
+            echo '<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>'
           fi
-        done
+        fi
         
     - name: 📦 إنشاء أرشيف احتياطي
       run: |
         echo "=== 📦 إنشاء نسخة احتياطية ==="
         timestamp=$(date +%Y%m%d_%H%M%S)
-        zip -r "web_app_backup_$timestamp.zip" . -x ".git/*" "*.zip"
+        
+        # إنشاء أرشيف بدون ملفات النظام
+        zip -r "web_app_backup_$timestamp.zip" . \
+          -x "*.git*" \
+          -x "*.zip" \
+          -x ".github/*" \
+          -x "node_modules/*" \
+          -x ".DS_Store"
+          
         echo "✅ تم الإنشاء: web_app_backup_$timestamp.zip"
+        echo "الحجم: $(du -h web_app_backup_$timestamp.zip | cut -f1)"
         
     - name: 📊 إنشاء تقرير البناء
       run: |
         echo "=== 📊 تقرير البناء ==="
-        echo "الوقت: $(date)"
+        echo "الموقع: https://mohamadvkd.github.io/web2apk/"
+        echo "الوقت: $(date '+%Y-%m-%d %H:%M:%S')"
         echo "المستخدم: ${{ github.actor }}"
-        echo "الرسالة: ${{ github.event.head_commit.message }}"
+        echo "الرسالة: '${{ github.event.head_commit.message }}'"
         echo ""
-        echo "📈 إحصائيات الملفات:"
-        echo "- HTML: $(find . -name "*.html" | wc -l) ملف"
-        echo "- JavaScript: $(find . -name "*.js" | wc -l) ملف"
-        echo "- إجمالي: $(find . -type f | wc -l) ملف"
         
-    - name: 📤 رفع التقارير
-      uses: actions/upload-artifact@v3
+        # إحصائيات الملفات
+        html_count=$(find . -name "*.html" | wc -l)
+        js_count=$(find . -name "*.js" | wc -l)
+        total_files=$(find . -type f ! -path "./.git/*" | wc -l)
+        
+        echo "📈 إحصائيات الملفات:"
+        echo "- HTML: $html_count ملف"
+        echo "- JavaScript: $js_count ملف"
+        echo "- إجمالي الملفات: $total_files ملف"
+        
+        # حجم المشروع
+        project_size=$(du -sh . 2>/dev/null | cut -f1 || echo "غير معروف")
+        echo "الحجم الإجمالي: $project_size"
+        
+    - name: 📤 رفع التقارير (الإصدار المحدث)
+      uses: actions/upload-artifact@v4
       with:
         name: build-reports
-        path: |
-          web_app_backup_*.zip
-        retention-days: 7
+        path: web_app_backup_*.zip
+        retention-days: 5
+        if-no-files-found: warn
+        
+    - name: 🎉 إشعار اكتمال البناء
+      run: |
+        echo ""
+        echo "========================================"
+        echo "✅ ✅ ✅ اكتمل البناء بنجاح! ✅ ✅ ✅"
+        echo "========================================"
+        echo "📁 تم حفظ نسخة احتياطية في Artifacts"
+        echo "🌐 الموقع: https://mohamadvkd.github.io/web2apk/"
+        echo "🕐 وقت البناء: $(date '+%H:%M:%S')"
+        echo "========================================"
