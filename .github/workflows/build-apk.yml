@@ -1,1 +1,37 @@
+# .github/workflows/build-apk.yml
+name: Build Android APK
 
+on:
+  workflow_dispatch:  # يسمح لك بتشغيل العملية يدوياً من صفحة Actions
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 تحميل الكود
+      uses: actions/checkout@v3
+
+    - name: ⚙️ إعداد بيئة Android
+      uses: android-actions/setup-android@v2
+
+    - name: 📦 إنشاء APK تجريبي (هذه خطوة تجريبية)
+      run: |
+        echo "✅ هذه خطوة تجريبية!"
+        echo "لقد قمت برفع:"
+        find . -type f -name "*.html" -o -name "*.js" | while read file; do
+          echo "  - $file"
+        done
+        # لاحقاً، سنضيف هنا أوامر Cordova لبناء APK حقيقي
+        echo "سيتم بناء APK هنا في المستقبل."
+
+    - name: 📁 إنشاء ملف ZIP بديل للتنزيل
+      run: |
+        zip -r web_files.zip index.html js/
+        echo "✅ تم إنشاء أرشيف يحتوي على ملفات موقعك: web_files.zip"
+
+    - name: 📤 رفع الأرشيف كمنتج (Artifact)
+      uses: actions/upload-artifact@v3
+      with:
+        name: web-files-archive
+        path: web_files.zip
