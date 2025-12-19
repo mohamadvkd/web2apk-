@@ -44,7 +44,8 @@
             <h3>انقر لرفع ملفات موقعك</h3>
             <p>HTML, CSS, JavaScript, الصور</p>
             <p style="margin-top:15px;color:#666;font-size:0.9em;">اسحب وأفلت أو انقر للاختيار</p>
-            <input type="file" id="fileInput" multiple accept=".html,.css,.js,.png,.jpg,.jpeg,.gif,.svg" style="display:none">
+            <input type="file" id="fileInput" multiple accept=".html,.css,.js,.png,.jpg,.jpeg,.gif,.svg" style="display:none" 
+       onchange="handleFileSelect(event)">
         </div>
         <div id="fileList"><p style="color:#666;text-align:center;padding:30px;">📂 لا توجد ملفات مرفوعة</p></div>
         <button id="buildBtn" onclick="buildAPK()" disabled><span>🛠️ بناء ملف ZIP</span></button>
